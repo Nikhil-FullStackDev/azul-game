@@ -113,3 +113,17 @@ button { font: inherit; color: inherit; }
 
 .chip[data-view] { cursor: pointer; } .chip.view { background: #ffffff33; }
 .pb.mini { max-width: none; }
+
+/* ---------- mobile polish ---------- */
+html { -webkit-text-size-adjust: 100%; }
+body { overflow-x: hidden; }
+img { max-width: 100%; }
+@media (pointer: coarse) {
+  button, .btn, select { min-height: 44px; touch-action: manipulation; }
+  input, .field { font-size: 16px; min-height: 44px; } /* >=16px stops iOS zoom-on-focus */
+}
+@media (max-width: 380px) {
+  .page { padding-left: 12px; padding-right: 12px; }
+  .logo h1 { font-size: 34px; }
+  #game { padding-left: 4px; padding-right: 4px; }
+}
