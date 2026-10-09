@@ -25,7 +25,7 @@
   let net = null;            // {code, token, es, snap}
   let view = null, you = 0, snap = null, inGame = false;
   let sel = null, hintRow = null;  // sel = {src, color}; hintRow = row suggested by the hint (0..5)
-  let viewing = 0, canUndo = false;
+  let viewing = 0, canUndo = false, ackSeq = -1;
   let lastSeq = -1, busy = false, wasMyTurn = false, overShown = false, lastScoredSeq = -1, wake = null;
 
   // ---------- tiles ----------
@@ -108,7 +108,7 @@
   function scheduleLocalBot() {
     clearTimeout(local.timer);
     const S = local.S;
-    if (S.winner !== null || !S.players[S.turn].bot) return;
+    if (S.winner !== null || !S.players[S.turn].bot || reviewing()) return;
     const recap = S.scored && S.scored.seq === S.seq;
     local.timer = setTimeout(() => {
       if (!local || local.S !== S) return;
@@ -199,7 +199,7 @@
   function enterGame() {
     destroyGame();
     document.querySelectorAll('.sheet').forEach(e => e.remove());
-    inGame = true; viewing = you; sel = hintRow = null; lastSeq = -1; wasMyTurn = false; overShown = false; busy = false; lastScoredSeq = -1;
+    inGame = true; ackSeq = -1; viewing = you; sel = hintRow = null; lastSeq = -1; wasMyTurn = false; overShown = false; busy = false; lastScoredSeq = -1;
     app.innerHTML = `<div id="game">
       <div class="top"><div class="chips" id="chips"></div><button class="hint" id="hint" aria-label="Hint">💡</button><button class="menu" id="menu" aria-label="Menu">☰</button></div>
       <div id="status"></div><div id="recap"></div>
@@ -221,6 +221,7 @@
   function setView(v) {
     if (inGame && lastSeq >= 0 && v.seq < lastSeq) enterGame(); // a fresh game restarts the counter
     view = v;
+    if (ackSeq > v.seq) ackSeq = -1; // an undo rewound the game
     if (!inGame) return;
     if (v.seq !== lastSeq) {
       const l = v.last;
@@ -232,10 +233,11 @@
     if (mine && !wasMyTurn && lastSeq > 0) buzz(40);
     wasMyTurn = mine;
     paint();
-    if (v.winner !== null) setTimeout(() => inGame && view === v && showWin(), 900);
+    if (v.winner !== null && !reviewing()) setTimeout(() => inGame && view === v && showWin(), 900);
   }
 
-  const myMove = () => view && view.winner === null && view.turn === you && !busy;
+  const reviewing = () => !!(view && view.scored && view.scored.seq === view.seq && ackSeq !== view.seq);
+  const myMove = () => view && view.winner === null && view.turn === you && !busy && !reviewing();
   const poolOf = src => src === G.CENTER ? view.center : view.factories[src];
 
   // Coordinates are pixels on the 894px board photo (public/img/board.jpg); CSS scales them.
@@ -243,10 +245,12 @@
   const PAWN = ['#ffffff', '#c58bff', '#46f08f', '#ff9a45'];
   const at = (cls, x, y, w, extra = '', h) => `<i class="${cls}" style="--x:${x};--y:${y};--w:${w}${h ? `;--h:${h}` : ''}" ${extra}></i>`;
   function boardHtml(p, i, mine) {
+    const rev = reviewing();
+    if (rev) p = { ...p, ...view.scored.before[i] };
     const turn = view.winner === null && view.turn === i;
     const canPlace = mine && myMove() && sel;
     let h = '';
-    const fresh = view.scored && view.scored.seq === view.seq ? view.scored.players[i].placed : [];
+    const fresh = !rev && view.scored && view.scored.seq === view.seq ? view.scored.players[i].placed : [];
     for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
       const on = p.wall[r][c];
       h += at(`wc ${on ? 'on' : ''} ${on && fresh.some(x => x.r === r && x.c === c) ? 'new' : ''}`, WALL_X[c], ROW_Y[r], 68);
@@ -277,37 +281,41 @@
 
   function paint() {
     if (!inGame || !view) return;
-    const v = view, me = v.players[you], over = v.winner !== null, mine = myMove();
-    $('#chips').innerHTML = v.players.map((p, i) => `<div class="chip ${!over && v.turn === i ? 'turn' : ''} ${viewing === i ? 'view' : ''}" data-view="${i}"><span>${esc(p.name)}</span><b>${p.score}</b></div>`).join('');
+    const v = view, over = v.winner !== null, mine = myMove(), rev = reviewing();
+    $('#chips').innerHTML = v.players.map((p, i) => `<div class="chip ${!over && v.turn === i ? 'turn' : ''} ${viewing === i ? 'view' : ''}" data-view="${i}"><span>${esc(p.name)}</span><b>${rev ? v.scored.before[i].score : p.score}</b></div>`).join('');
     // factories + middle
-    const facs = v.factories.map((f, i) => `<div class="fac ${f.length ? '' : 'empty'}">${f.map(c => {
+    const fl = rev ? v.factories.map(() => []) : v.factories, cen = rev ? [] : v.center; // new round's tiles stay hidden until you resolve
+    const facs = fl.map((f, i) => `<div class="fac ${f.length ? '' : 'empty'}">${f.map(c => {
       const s = sel && sel.src === i;
       return tile(c, mine ? `pick ${s ? (c === sel.color ? 'sel' : 'rest') : ''}` : '', `data-src="${i}" data-color="${c}"`);
     }).join('')}</div>`).join('');
-    const mid = [...v.center].sort((a, b) => b - a).map(c => {
+    const mid = [...cen].sort((a, b) => b - a).map(c => {
       if (c === G.MARKER) return tile(c);
       const s = sel && sel.src === G.CENTER;
       return tile(c, mine ? `pick ${s ? (c === sel.color ? 'sel' : 'rest') : ''}` : '', `data-src="-1" data-color="${c}"`);
     }).join('');
-    $('#table').innerHTML = `<div class="factories">${facs}</div><div class="pool"><small>Middle${v.center.includes(G.MARKER) ? ' · first taker gets the 1 marker (−1)' : ''}</small>${mid}</div>`;
+    $('#table').innerHTML = `<div class="factories">${facs}</div><div class="pool"><small>Middle${cen.includes(G.MARKER) ? ' · first taker gets the 1 marker (−1)' : ''}</small>${mid}</div>`;
     if (viewing >= v.players.length) viewing = you;
     canUndo = undoAvailable();
     $('#boards').innerHTML = boardHtml(v.players[viewing], viewing, viewing === you)
       + (viewing !== you ? `<div class="go"><button class="btn" id="back">← Back to my board</button></div>` : '')
+      + (rev ? `<div class="go"><button class="btn pri" id="resolve">Resolve round ${v.scored.round} →</button></div>` : '')
       + (canUndo ? `<div class="go"><button class="btn" id="undo">↩ Undo move</button></div>` : '');
     const back = $('#back'); if (back) back.onclick = () => { viewing = you; paint(); };
+    const rs = $('#resolve'); if (rs) rs.onclick = resolve;
     const undo = $('#undo'); if (undo) undo.onclick = doUndo;
 
     const st = $('#status');
     st.className = mine ? 'me' : '';
-    if (over) st.textContent = 'Game over';
+    if (rev) st.textContent = `Round ${v.scored.round} is done. Check the floors, then resolve.`;
+    else if (over) st.textContent = 'Game over';
     else if (v.turn === you) st.textContent = sel ? 'Now tap a highlighted line, or the floor' : 'Your turn: tap tiles to take every tile of that color';
     else st.textContent = `${v.players[v.turn].name} is thinking…`;
     const l = v.last;
     $('#meta').textContent = `Round ${v.round} · bag ${v.bagCount} · lid ${v.lidCount}` + (l ? ` · ${v.players[l.pid].name} took ${l.count} ${CNAME[l.color]} → ${l.row === 5 ? 'floor' : 'line ' + (l.row + 1)}${l.marker ? ' (+marker)' : ''}` : '');
     // round recap
     const rc = $('#recap');
-    if (v.scored && v.scored.seq === v.seq && !over) {
+    if (v.scored && v.scored.seq === v.seq && !over && !rev) {
       rc.innerHTML = `<div class="recap"><b>Round ${v.scored.round} scored</b> · ${v.scored.players.map((s, i) => `${esc(v.players[i].name)} ${s.delta >= 0 ? '+' : ''}${s.delta}${s.penalty ? ` (floor ${s.penalty})` : ''}`).join(' · ')}</div>`;
       if (lastScoredSeq !== v.seq) { lastScoredSeq = v.seq; buzz(20); }
     } else rc.innerHTML = '';
@@ -328,6 +336,13 @@
     }
     const row = e.target.closest('[data-row]');
     if (row && sel && row.dataset.row !== '') place(+row.dataset.row);
+  }
+  function resolve() {
+    if (!reviewing()) return;
+    ackSeq = view.seq; buzz(15);
+    paint();
+    if (local) scheduleLocalBot();
+    if (view.winner !== null) setTimeout(showWin, 400);
   }
   function hint() {
     if (!myMove()) return;
@@ -364,7 +379,7 @@
     if (!undoAvailable()) return;
     buzz(10);
     if (local) {
-      clearTimeout(local.timer);
+      clearTimeout(local.timer); ackSeq = -1;
       local.S = JSON.parse(local.undo.snap); local.undo = null;
       sel = hintRow = null; viewing = you;
       setView(G.view(local.S, 0)); scheduleLocalBot();

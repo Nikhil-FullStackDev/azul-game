@@ -141,6 +141,7 @@
   function endRound(S) {
     const scored = [];
     let ended = false;
+    const before = S.players.map(p => JSON.parse(JSON.stringify({ lines: p.lines, wall: p.wall, floor: p.floor, score: p.score })));
     S.players.forEach(p => {
       const placed = [];
       let gain = 0;
@@ -162,7 +163,7 @@
       p.floor = [];
       if (p.wall.some(row => row.every(Boolean))) ended = true;
     });
-    S.scored = { round: S.round, seq: S.seq, players: scored };
+    S.scored = { round: S.round, seq: S.seq, before, players: scored };
     if (ended) return finish(S);
     S.round++;
     fillFactories(S);

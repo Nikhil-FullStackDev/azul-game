@@ -109,7 +109,8 @@ function scheduleBots(room) {
   if (!botShouldPlay(room)) return;
   // Leave a human a moment to undo their move before the bot replies.
   const humanJustMoved = s.last && !room.players[s.last.pid].bot && room.undo && room.undo.seq === s.seq;
-  const [lo, hi] = humanJustMoved ? [3200, 3800] : [1000, 1700];
+  const reviewing = s.scored && s.scored.seq === s.seq; // players look over the floors before the round resolves
+  const [lo, hi] = reviewing ? [6500, 7200] : humanJustMoved ? [3200, 3800] : [1000, 1700];
   room.botTimer = setTimeout(() => {
     room.botTimer = null;
     if (room.state !== s || !botShouldPlay(room)) return;
