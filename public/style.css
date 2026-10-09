@@ -1,7 +1,7 @@
 :root {
   --bg: #0b2240; --bg2: #123662; --card: #153e6e; --ink: #f4f1e8; --dim: #9db6d4; --acc: #f2c230; --bad: #e5484d; --good: #2fb36d;
   --c0: #2f78e0; --c1: #f2c230; --c2: #dc4a3f; --c3: #2e343d; --c4: #27b5a8;
-  --s: min(11.5vw, 46px);
+  --s: min(calc((100vw - 72px) / 10.7), 46px);
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; min-height: 100%; background: radial-gradient(120% 80% at 50% 0, var(--bg2), var(--bg)) fixed; color: var(--ink);
@@ -76,7 +76,7 @@ button { font: inherit; color: inherit; }
 .pb.turn { box-shadow: 0 0 0 2px var(--acc); }
 .pb header { display: flex; justify-content: space-between; align-items: baseline; }
 .pb header b { font-size: 15px; } .pb header span { color: var(--acc); font-weight: 800; font-size: 18px; }
-.pb.mini { --s: min(6.6vw, 28px); padding: 8px; }
+.pb.mini { --s: min(calc((100vw - 72px) / 13), 30px); padding: 8px; }
 .grid { display: flex; gap: calc(var(--s) * .35); align-items: flex-start; justify-content: center; }
 .lines { display: flex; flex-direction: column; gap: 3px; align-items: flex-end; }
 .ln { display: flex; gap: 3px; padding: 2px; border-radius: 8px; border: 2px solid transparent; justify-content: flex-end; cursor: default; min-height: calc(var(--s) + 8px); align-items: center; }
