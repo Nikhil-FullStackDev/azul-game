@@ -81,6 +81,7 @@ function snapshot(room, idx) {
     code: room.code, you: idx, host: idx === 0,
     lobby: room.players.map((p, i) => ({ name: p.name, bot: p.bot, connected: p.bot || room.streams.has(i), })),
     game: room.state ? G.view(room.state, idx) : null,
+    canUndo: !!(room.state && room.undo && room.undo.pid === idx && room.undo.seq === room.state.seq && room.state.winner === null),
   };
 }
 function broadcast(room) {
@@ -106,7 +107,9 @@ function scheduleBots(room) {
   room.botTimer = null;
   const s = room.state;
   if (!botShouldPlay(room)) return;
-  const [lo, hi] = [1000, 1700];
+  // Leave a human a moment to undo their move before the bot replies.
+  const humanJustMoved = s.last && !room.players[s.last.pid].bot && room.undo && room.undo.seq === s.seq;
+  const [lo, hi] = humanJustMoved ? [3200, 3800] : [1000, 1700];
   room.botTimer = setTimeout(() => {
     room.botTimer = null;
     if (room.state !== s || !botShouldPlay(room)) return;
@@ -188,10 +191,19 @@ async function api(req, res, url) {
   if (url.pathname === '/api/ping') return json(res, 200, { ok: true });
   if (url.pathname === '/api/act') {
     if (!room.state) return json(res, 400, { error: 'Not started' });
+    const before = JSON.stringify(room.state);
     const r = G.act(room.state, me, b.a || {});
     if (r.error) return json(res, 400, r);
+    room.undo = { pid: me, seq: room.state.seq, snap: before };
     broadcast(room);
     return json(res, 200, r);
+  }
+  if (url.pathname === '/api/undo') {
+    if (!room.state || !room.undo || room.undo.pid !== me || room.undo.seq !== room.state.seq || room.state.winner !== null) return json(res, 400, { error: 'Too late to undo' });
+    clearTimeout(room.botTimer);
+    room.state = JSON.parse(room.undo.snap); room.undo = null;
+    broadcast(room);
+    return json(res, 200, { ok: true });
   }
   if (url.pathname === '/api/leave') { // polite exit: a bot takes the seat mid-game, or the seat is freed in the lobby
     if (me === 0) return json(res, 400, { error: 'Host cannot leave' });
@@ -216,7 +228,7 @@ async function api(req, res, url) {
   } else if (url.pathname === '/api/start') {
     if (room.players.length < G.MIN_PLAYERS) return json(res, 400, { error: `Need ${G.MIN_PLAYERS}+ players` });
     clearTimeout(room.botTimer);
-    room.state = G.create(room.players);
+    room.state = G.create(room.players); room.undo = null;
   } else if (url.pathname === '/api/replace') { // hand a disconnected player over to a bot
     const i = Number(b.index), p = room.players[i];
     if (!p || p.bot || i === 0) return json(res, 400, { error: 'Cannot replace' });

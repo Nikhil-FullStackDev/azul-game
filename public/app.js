@@ -24,7 +24,8 @@
   let local = null;          // {S, bots, timer, me}
   let net = null;            // {code, token, es, snap}
   let view = null, you = 0, snap = null, inGame = false;
-  let sel = null, selRow = null;   // sel = {src, color}; selRow = 0..5
+  let sel = null, hintRow = null;  // sel = {src, color}; hintRow = row suggested by the hint (0..5)
+  let viewing = 0, canUndo = false;
   let lastSeq = -1, busy = false, wasMyTurn = false, overShown = false, lastScoredSeq = -1, wake = null;
 
   // ---------- tiles ----------
@@ -115,7 +116,7 @@
       const r = a && G.act(S, id, a);
       if (!r || r.error) { const m = G.moves(S, id); G.act(S, id, m[m.length - 1]); }
       setView(G.view(S, 0)); scheduleLocalBot();
-    }, (recap ? 2600 : 900) + Math.random() * 600);
+    }, (recap ? 2600 : 900) + (S.last && S.last.pid === 0 && !recap ? 2200 : 0) + Math.random() * 600);
   }
 
   // ---------- online ----------
@@ -198,7 +199,7 @@
   function enterGame() {
     destroyGame();
     document.querySelectorAll('.sheet').forEach(e => e.remove());
-    inGame = true; sel = selRow = null; lastSeq = -1; wasMyTurn = false; overShown = false; busy = false; lastScoredSeq = -1;
+    inGame = true; viewing = you; sel = hintRow = null; lastSeq = -1; wasMyTurn = false; overShown = false; busy = false; lastScoredSeq = -1;
     app.innerHTML = `<div id="game">
       <div class="top"><div class="chips" id="chips"></div><button class="hint" id="hint" aria-label="Hint">💡</button><button class="menu" id="menu" aria-label="Menu">☰</button></div>
       <div id="status"></div><div id="recap"></div>
@@ -210,7 +211,7 @@
     requestWake();
   }
   function destroyGame() {
-    inGame = false; view = null; sel = selRow = null;
+    inGame = false; view = null; sel = hintRow = null;
     if (local) clearTimeout(local.timer);
   }
   async function requestWake() {
@@ -224,7 +225,7 @@
     if (v.seq !== lastSeq) {
       const l = v.last;
       if (lastSeq >= 0 && l && l.pid !== you && v.seq === lastSeq + 1) buzz(0);
-      sel = selRow = null;
+      sel = hintRow = null;
     }
     lastSeq = v.seq;
     const mine = v.winner === null && v.turn === you;
@@ -251,7 +252,7 @@
       h += at(`wc ${on ? 'on' : ''} ${on && fresh.some(x => x.r === r && x.c === c) ? 'new' : ''}`, WALL_X[c], ROW_Y[r], 68);
     }
     for (let r = 0; r < 5; r++) {
-      const line = p.lines[r], ok = canPlace && G.rowAccepts(p, r, sel.color), pre = mine && selRow === r;
+      const line = p.lines[r], ok = canPlace && G.rowAccepts(p, r, sel.color), pre = mine && hintRow === r;
       h += at(`hit ${ok ? 'ok' : ''} ${pre ? 'pre' : ''}`, 232, ROW_Y[r], 392, ok ? `data-row="${r}"` : '', 76);
       const add = pre ? Math.min(r + 1 - line.n, countSel()) : 0;
       for (let d = 0; d < r + 1; d++) {
@@ -260,14 +261,14 @@
         else if (d < line.n + add) h += at(`t c${sel.color} ghost`, x, ROW_Y[r], 66);
       }
     }
-    const fOk = canPlace, fPre = mine && selRow === 5;
-    h += at(`hit ${fOk ? 'ok' : ''} ${fPre ? 'pre' : ''}`, 333, 792, 618, fOk ? 'data-row="5"' : '', 128);
-    p.floor.forEach((t, k) => { h += at(t === G.MARKER ? 't mk' : `t c${t}`, 77 + 85.5 * k, 780, 58); });
-    if (fPre) for (let k = 0; k < Math.min(countSel(), 7 - p.floor.length); k++) h += at(`t c${sel.color} ghost`, 77 + 85.5 * (p.floor.length + k), 780, 58);
+    const fOk = canPlace, fPre = mine && hintRow === 5;
+    h += at(`hit ${fOk ? 'ok' : ''} ${fPre ? 'pre' : ''}`, 330, 800, 604, fOk ? 'data-row="5"' : '', 108);
+    p.floor.forEach((t, k) => { h += at(t === G.MARKER ? 't mk' : `t c${t}`, 77 + 84.5 * k, 802, 64); });
+    if (fPre) for (let k = 0; k < Math.min(countSel(), 7 - p.floor.length); k++) h += at(`t c${sel.color} ghost`, 77 + 84.5 * (p.floor.length + k), 802, 64);
     const s = Math.min(100, p.score);
     const px = s === 0 ? 70 : 68 + 40 * ((s - 1) % 20), py = s === 0 ? 32 : TRACK_Y[((s - 1) / 20) | 0];
     h += `<i class="sm" style="--x:${px};--y:${py};--w:28;--pc:${PAWN[i]}"></i>`;
-    return `<div class="pb ${mine ? '' : 'mini'} ${turn ? 'turn' : ''}"><header><b>${esc(p.name)}${mine ? ' (you)' : ''}</b><span>${p.score}</span></header><div class="bd">${h}</div></div>`;
+    return `<div class="pb ${turn ? 'turn' : ''}"><header><b>${esc(p.name)}${mine ? ' (you)' : ''}</b><span>${p.score}</span></header><div class="bd">${h}</div></div>`;
   }
   function countSel() {
     if (!sel || !view) return 0;
@@ -277,7 +278,7 @@
   function paint() {
     if (!inGame || !view) return;
     const v = view, me = v.players[you], over = v.winner !== null, mine = myMove();
-    $('#chips').innerHTML = v.players.map((p, i) => `<div class="chip ${!over && v.turn === i ? 'turn' : ''}"><span>${esc(p.name)}</span><b>${p.score}</b></div>`).join('');
+    $('#chips').innerHTML = v.players.map((p, i) => `<div class="chip ${!over && v.turn === i ? 'turn' : ''} ${viewing === i ? 'view' : ''}" data-view="${i}"><span>${esc(p.name)}</span><b>${p.score}</b></div>`).join('');
     // factories + middle
     const facs = v.factories.map((f, i) => `<div class="fac ${f.length ? '' : 'empty'}">${f.map(c => {
       const s = sel && sel.src === i;
@@ -289,16 +290,18 @@
       return tile(c, mine ? `pick ${s ? (c === sel.color ? 'sel' : 'rest') : ''}` : '', `data-src="-1" data-color="${c}"`);
     }).join('');
     $('#table').innerHTML = `<div class="factories">${facs}</div><div class="pool"><small>Middle${v.center.includes(G.MARKER) ? ' · first taker gets the 1 marker (−1)' : ''}</small>${mid}</div>`;
-    $('#boards').innerHTML = boardHtml(me, you, true)
-      + (mine && sel ? `<div class="go"><button class="btn pri" id="go" ${selRow === null ? 'disabled' : ''}>${selRow === null ? 'Choose a line or the floor' : `Place ${countSel()} ${CNAME[sel.color]} ${selRow === 5 ? 'on the floor' : 'on line ' + (selRow + 1)}`}</button><button class="btn" id="cancel" style="flex:0 0 auto">✕</button></div>` : '')
-      + v.players.map((p, i) => i === you ? '' : boardHtml(p, i, false)).join('');
-    const go = $('#go'); if (go) go.onclick = commit;
-    const cancel = $('#cancel'); if (cancel) cancel.onclick = () => { sel = selRow = null; paint(); };
+    if (viewing >= v.players.length) viewing = you;
+    canUndo = undoAvailable();
+    $('#boards').innerHTML = boardHtml(v.players[viewing], viewing, viewing === you)
+      + (viewing !== you ? `<div class="go"><button class="btn" id="back">← Back to my board</button></div>` : '')
+      + (canUndo ? `<div class="go"><button class="btn" id="undo">↩ Undo move</button></div>` : '');
+    const back = $('#back'); if (back) back.onclick = () => { viewing = you; paint(); };
+    const undo = $('#undo'); if (undo) undo.onclick = doUndo;
 
     const st = $('#status');
     st.className = mine ? 'me' : '';
     if (over) st.textContent = 'Game over';
-    else if (v.turn === you) st.textContent = sel ? 'Now pick a line (or the floor)' : 'Your turn: tap tiles to take every tile of that color';
+    else if (v.turn === you) st.textContent = sel ? 'Now tap a highlighted line, or the floor' : 'Your turn: tap tiles to take every tile of that color';
     else st.textContent = `${v.players[v.turn].name} is thinking…`;
     const l = v.last;
     $('#meta').textContent = `Round ${v.round} · bag ${v.bagCount} · lid ${v.lidCount}` + (l ? ` · ${v.players[l.pid].name} took ${l.count} ${CNAME[l.color]} → ${l.row === 5 ? 'floor' : 'line ' + (l.row + 1)}${l.marker ? ' (+marker)' : ''}` : '');
@@ -313,34 +316,34 @@
 
   // ---------- input ----------
   function onTap(e) {
+    const vw = e.target.closest('[data-view]');
+    if (vw && view) { viewing = +vw.dataset.view; return paint(); }
     if (!myMove()) return;
     const t = e.target.closest('[data-color]');
     if (t && t.dataset.src !== undefined && t.classList.contains('pick')) {
       const src = +t.dataset.src, color = +t.dataset.color;
-      if (sel && sel.src === src && sel.color === color) sel = selRow = null;
-      else { sel = { src, color }; selRow = null; }
+      if (sel && sel.src === src && sel.color === color) sel = hintRow = null;
+      else { sel = { src, color }; hintRow = null; viewing = you; }
       buzz(8); return paint();
     }
     const row = e.target.closest('[data-row]');
-    if (row && sel && row.dataset.row !== '') {
-      const r = +row.dataset.row;
-      if (selRow === r) return commit();
-      selRow = r; buzz(8); return paint();
-    }
+    if (row && sel && row.dataset.row !== '') place(+row.dataset.row);
   }
   function hint() {
     if (!myMove()) return;
     const a = BOT.plan(view, you);
     if (!a) return;
-    sel = { src: a.src, color: a.color }; selRow = a.row; paint();
+    viewing = you; sel = { src: a.src, color: a.color }; hintRow = a.row; paint();
   }
-  function commit() {
-    if (!myMove() || !sel || selRow === null) return;
-    const a = { src: sel.src, color: sel.color, row: selRow };
+  function place(row) {
+    if (!myMove() || !sel) return;
+    const a = { src: sel.src, color: sel.color, row };
     buzz(15);
     if (local) {
+      const before = JSON.stringify(local.S);
       const r = G.act(local.S, you, a);
       if (r.error) return toast(r.error);
+      local.undo = { seq: local.S.seq, snap: before };
       setView(G.view(local.S, 0)); scheduleLocalBot();
     } else if (net) {
       busy = true; paint();
@@ -349,6 +352,24 @@
         if (r.error) toast(r.error);
         if (inGame) paint();
       });
+    }
+  }
+  // Undo is offered until the next player acts (bots wait a moment so there is time to use it).
+  function undoAvailable() {
+    if (!view || view.winner !== null) return false;
+    if (local) return !!local.undo && local.undo.seq === local.S.seq;
+    return !!(snap && snap.canUndo);
+  }
+  function doUndo() {
+    if (!undoAvailable()) return;
+    buzz(10);
+    if (local) {
+      clearTimeout(local.timer);
+      local.S = JSON.parse(local.undo.snap); local.undo = null;
+      sel = hintRow = null; viewing = you;
+      setView(G.view(local.S, 0)); scheduleLocalBot();
+    } else if (net) {
+      call('/api/undo', { code: net.code, token: net.token }).then(r => { if (r.error) toast(r.error); });
     }
   }
 

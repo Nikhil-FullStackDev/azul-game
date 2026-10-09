@@ -95,7 +95,7 @@ button { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
 /* ---------- board photo with overlaid pieces (1 unit = 1 px of the 894px photo) ---------- */
-.pb.mini { max-width: 330px; padding: 8px; }
+
 .boards { align-items: center; }
 .bd { container-type: inline-size; position: relative; width: 100%; aspect-ratio: 894 / 896; background: url(img/board.jpg) center / 100% 100%; border-radius: 8px; overflow: hidden; --p: .11186cqw; }
 .bd > * { position: absolute; left: calc(var(--x) * var(--p)); top: calc(var(--y) * var(--p)); width: calc(var(--w) * var(--p)); height: calc(var(--h, var(--w)) * var(--p)); transform: translate(-50%, -50%); }
@@ -110,3 +110,6 @@ button { font: inherit; color: inherit; }
 .hit.pre { border-color: var(--acc); background: #f2c23055; animation: none; }
 @keyframes pulse { 50% { background: #ffffff14; } }
 .sm { border-radius: 50%; background: var(--pc); box-shadow: 0 0 0 calc(2.5 * var(--p)) #000b, 0 0 calc(8 * var(--p)) #000; transition: left .5s, top .5s; pointer-events: none; }
+
+.chip[data-view] { cursor: pointer; } .chip.view { background: #ffffff33; }
+.pb.mini { max-width: none; }

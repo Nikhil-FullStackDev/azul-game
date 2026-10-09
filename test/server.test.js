@@ -55,3 +55,27 @@ test('room flow: create, add bot, start, act, hidden bag', async () => {
   assert.strictEqual(bad.status, 400);
   assert.strictEqual((await post('/api/act', { code: c.code, token: 'nope', a: {} })).status, 403);
 });
+
+test('undo restores the state until the next move', async () => {
+  const c = (await post('/api/create', { name: 'Host' })).body;
+  await post('/api/addbot', { code: c.code, token: c.token });
+  // start until the host has the first turn
+  let s;
+  for (let i = 0; i < 30; i++) {
+    await post('/api/start', { code: c.code, token: c.token });
+    s = await firstSnap(c.code, c.token);
+    if (s.game.turn === 0) break;
+    await post('/api/lobby', { code: c.code, token: c.token });
+  }
+  if (s.game.turn !== 0) return; // unlucky seed run: nothing to assert
+  assert.strictEqual((await post('/api/undo', { code: c.code, token: c.token })).status, 400);
+  const color = s.game.factories[0][0];
+  assert.strictEqual((await post('/api/act', { code: c.code, token: c.token, a: { src: 0, color, row: 5 } })).status, 200);
+  const after = await firstSnap(c.code, c.token);
+  assert.strictEqual(after.canUndo, true);
+  assert.strictEqual((await post('/api/undo', { code: c.code, token: c.token })).status, 200);
+  const back = await firstSnap(c.code, c.token);
+  assert.deepStrictEqual(back.game.factories, s.game.factories);
+  assert.strictEqual(back.game.turn, 0);
+  assert.strictEqual(back.canUndo, false);
+});
