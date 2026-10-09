@@ -14,7 +14,7 @@ const HOST = process.env.HOST || (process.env.RENDER ? '0.0.0.0' : '::');
 const PUBLIC = path.join(__dirname, 'public');
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
-  '.json': 'application/manifest+json', '.webp': 'image/webp', '.png': 'image/png', '.svg': 'image/svg+xml',
+  '.json': 'application/manifest+json', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml',
 };
 const MAX_ROOMS = 200, MAX_STREAMS_PER_SEAT = 3, MAX_CREATE_PER_HOUR = 30, TAKEOVER_MS = 25e3;
 const NAMES = ['Ada', 'Bram', 'Cleo', 'Dax'];
@@ -28,7 +28,7 @@ const files = new Map();
     const ext = path.extname(f.name), type = MIME[ext];
     if (!type) continue;
     const body = fs.readFileSync(full);
-    const binary = ext === '.webp' || ext === '.png';
+    const binary = ext === '.webp' || ext === '.png' || ext === '.jpg';
     files.set('/' + path.relative(PUBLIC, full).split(path.sep).join('/'), {
       type, body, gz: binary ? null : zlib.gzipSync(body, { level: 9 }),
       etag: '"' + crypto.createHash('sha1').update(body).digest('base64url').slice(0, 16) + '"',

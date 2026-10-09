@@ -8,7 +8,7 @@ self.addEventListener('activate', e => e.waitUntil(
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin || u.pathname.startsWith('/api/')) return;
-  const immutable = /\.(webp|png)$/.test(u.pathname);
+  const immutable = /\.(webp|png|jpg)$/.test(u.pathname);
   e.respondWith(immutable
     ? caches.match(e.request).then(hit => hit || fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c)); return r; }))
     : fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c)); return r; })

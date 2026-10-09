@@ -237,33 +237,37 @@
   const myMove = () => view && view.winner === null && view.turn === you && !busy;
   const poolOf = src => src === G.CENTER ? view.center : view.factories[src];
 
+  // Coordinates are pixels on the 894px board photo (public/img/board.jpg); CSS scales them.
+  const ROW_Y = [357, 435, 512, 590, 668], WALL_X = [504, 582, 660, 737, 814], TRACK_Y = [78, 126, 175, 224, 273];
+  const PAWN = ['#ffffff', '#c58bff', '#46f08f', '#ff9a45'];
+  const at = (cls, x, y, w, extra = '', h) => `<i class="${cls}" style="--x:${x};--y:${y};--w:${w}${h ? `;--h:${h}` : ''}" ${extra}></i>`;
   function boardHtml(p, i, mine) {
     const turn = view.winner === null && view.turn === i;
     const canPlace = mine && myMove() && sel;
-    const rows = [0, 1, 2, 3, 4].map(r => {
-      const line = p.lines[r];
-      const ok = canPlace && G.rowAccepts(p, r, sel.color);
-      const pre = mine && selRow === r;
-      let slots = '';
-      for (let k = 0; k < r + 1; k++) {
-        const filled = k >= r + 1 - line.n;
-        if (filled) slots += tile(line.color, '', 'style="--ts:var(--s)"');
-        else if (pre && k >= r + 1 - Math.min(r + 1, line.n + countSel())) slots += `<i class="slot ghost" style="background:var(--c${sel.color})"></i>`;
-        else slots += '<i class="slot"></i>';
+    let h = '';
+    const fresh = view.scored && view.scored.seq === view.seq ? view.scored.players[i].placed : [];
+    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
+      const on = p.wall[r][c];
+      h += at(`wc ${on ? 'on' : ''} ${on && fresh.some(x => x.r === r && x.c === c) ? 'new' : ''}`, WALL_X[c], ROW_Y[r], 68);
+    }
+    for (let r = 0; r < 5; r++) {
+      const line = p.lines[r], ok = canPlace && G.rowAccepts(p, r, sel.color), pre = mine && selRow === r;
+      h += at(`hit ${ok ? 'ok' : ''} ${pre ? 'pre' : ''}`, 232, ROW_Y[r], 392, ok ? `data-row="${r}"` : '', 76);
+      const add = pre ? Math.min(r + 1 - line.n, countSel()) : 0;
+      for (let d = 0; d < r + 1; d++) {
+        const x = 388 - 76.5 * d;
+        if (d < line.n) h += at(`t c${line.color}`, x, ROW_Y[r], 66);
+        else if (d < line.n + add) h += at(`t c${sel.color} ghost`, x, ROW_Y[r], 66);
       }
-      return `<div class="ln ${ok ? 'ok' : ''} ${pre ? 'pre' : ''}" data-row="${ok ? r : ''}">${slots}</div>`;
-    }).join('');
-    const last = view.scored && view.scored.seq === view.seq ? view.scored.players[i].placed : [];
-    const wall = p.wall.map((row, r) => row.map((on, c) => {
-      const col = (c - r + 5) % 5;
-      const fresh = last.some(x => x.r === r && x.c === c);
-      return `<i class="w c${col} ${on ? 'on' : ''} ${fresh ? 'new' : ''}" data-g="${GLYPH[col]}"></i>`;
-    }).join('')).join('');
-    const floorOk = canPlace, floorPre = mine && selRow === 5;
-    const floor = G.FLOOR.map((pen, k) => `<div class="fs">${p.floor[k] !== undefined ? tile(p.floor[k], '', 'style="--ts:var(--s)"') : '<i class="slot"></i>'}<span>${pen}</span></div>`).join('');
-    return `<div class="pb ${mine ? '' : 'mini'} ${turn ? 'turn' : ''}"><header><b>${esc(p.name)}${mine ? ' (you)' : ''}</b><span>${p.score}</span></header>
-      <div class="grid"><div class="lines">${rows}</div><div class="wall">${wall}</div></div>
-      <div class="floor ${floorOk ? 'ok' : ''} ${floorPre ? 'pre' : ''}" data-row="${floorOk ? 5 : ''}">${floor}</div></div>`;
+    }
+    const fOk = canPlace, fPre = mine && selRow === 5;
+    h += at(`hit ${fOk ? 'ok' : ''} ${fPre ? 'pre' : ''}`, 333, 792, 618, fOk ? 'data-row="5"' : '', 128);
+    p.floor.forEach((t, k) => { h += at(t === G.MARKER ? 't mk' : `t c${t}`, 77 + 85.5 * k, 780, 58); });
+    if (fPre) for (let k = 0; k < Math.min(countSel(), 7 - p.floor.length); k++) h += at(`t c${sel.color} ghost`, 77 + 85.5 * (p.floor.length + k), 780, 58);
+    const s = Math.min(100, p.score);
+    const px = s === 0 ? 70 : 68 + 40 * ((s - 1) % 20), py = s === 0 ? 32 : TRACK_Y[((s - 1) / 20) | 0];
+    h += `<i class="sm" style="--x:${px};--y:${py};--w:28;--pc:${PAWN[i]}"></i>`;
+    return `<div class="pb ${mine ? '' : 'mini'} ${turn ? 'turn' : ''}"><header><b>${esc(p.name)}${mine ? ' (you)' : ''}</b><span>${p.score}</span></header><div class="bd">${h}</div></div>`;
   }
   function countSel() {
     if (!sel || !view) return 0;
