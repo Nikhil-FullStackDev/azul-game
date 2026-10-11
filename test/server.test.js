@@ -79,3 +79,14 @@ test('undo restores the state until the next move', async () => {
   assert.strictEqual(back.game.turn, 0);
   assert.strictEqual(back.canUndo, false);
 });
+
+test('voice chat link: host-only, http(s) only, shown in the snapshot', async () => {
+  const c = (await post('/api/create', { name: 'Host' })).body;
+  const j = (await post('/api/join', { code: c.code, name: 'Guest' })).body;
+  assert.strictEqual((await post('/api/settings', { code: c.code, token: j.token, voice: 'https://meet.example.com/x' })).status, 403);
+  assert.strictEqual((await post('/api/settings', { code: c.code, token: c.token, voice: 'javascript:alert(1)' })).status, 400);
+  assert.strictEqual((await post('/api/settings', { code: c.code, token: c.token, voice: ' https://meet.example.com/x ' })).status, 200);
+  assert.strictEqual((await firstSnap(c.code, j.token)).voice, 'https://meet.example.com/x');
+  assert.strictEqual((await post('/api/settings', { code: c.code, token: c.token, voice: '' })).status, 200);
+  assert.strictEqual((await firstSnap(c.code, c.token)).voice, '');
+});
