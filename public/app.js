@@ -24,7 +24,7 @@
   let local = null;          // {S, bots, timer, me}
   let net = null;            // {code, token, es, snap}
   let view = null, you = 0, snap = null, inGame = false;
-  let sel = null, hintRow = null;  // sel = {src, color}; hintRow = row suggested by the hint (0..5)
+  let sel = null;  // sel = {src, color}
   let viewing = 0, canUndo = false, ackSeq = -1;
   let lastSeq = -1, busy = false, wasMyTurn = false, overShown = false, lastScoredSeq = -1, wake = null;
 
@@ -83,7 +83,7 @@
       <li><b>Place</b> them on one pattern line (the staircase). A line holds one color, and not a color already on your wall row. Extras fall to the <b>floor</b> for penalties (−1, −1, −2, −2, −2, −3, −3).</li>
       <li>When all tiles are gone, each full line moves one tile to the wall and scores: 1 point, plus the length of the connected row and column runs it joins.</li>
       <li>The game ends after a round where someone completes a wall row. Bonuses: <b>+2</b> per full row, <b>+7</b> per full column, <b>+10</b> per color set of five.</li>
-      <li><b>Tap to confirm:</b> tap tiles, tap a line (tap it again or press Place). 💡 shows a suggestion.</li></ul>
+      <li><b>Tap to confirm:</b> tap tiles, tap a line (tap it again or press Place).</li></ul>
       <button class="btn pri" data-close>Got it</button>`);
   }
   function sheet(html, mid, onClose) {
@@ -202,19 +202,18 @@
   function enterGame() {
     destroyGame();
     document.querySelectorAll('.sheet').forEach(e => e.remove());
-    inGame = true; ackSeq = -1; viewing = you; sel = hintRow = null; lastSeq = -1; wasMyTurn = false; overShown = false; busy = false; lastScoredSeq = -1;
+    inGame = true; ackSeq = -1; viewing = you; sel = null; lastSeq = -1; wasMyTurn = false; overShown = false; busy = false; lastScoredSeq = -1;
     app.innerHTML = `<div id="game">
-      <div class="top"><div class="chips" id="chips"></div><button class="hint" id="hint" aria-label="Hint">💡</button><button class="menu" id="menu" aria-label="Menu">☰</button></div>
+      <div class="top"><div class="chips" id="chips"></div><button class="menu" id="menu" aria-label="Menu">☰</button></div>
       <div id="status"></div><div id="recap"></div>
       <div class="layout"><div class="table" id="table"></div><div class="boards" id="boards"></div></div>
       <div class="meta" id="meta"></div></div>`;
     $('#game').onclick = onTap;
     $('#menu').onclick = menu;
-    $('#hint').onclick = hint;
     requestWake();
   }
   function destroyGame() {
-    inGame = false; view = null; sel = hintRow = null;
+    inGame = false; view = null; sel = null;
     if (local) clearTimeout(local.timer);
   }
   async function requestWake() {
@@ -229,7 +228,7 @@
     if (v.seq !== lastSeq) {
       const l = v.last;
       if (lastSeq >= 0 && l && l.pid !== you && v.seq === lastSeq + 1) buzz(0);
-      sel = hintRow = null;
+      sel = null;
     }
     lastSeq = v.seq;
     const mine = v.winner === null && v.turn === you;
@@ -260,7 +259,7 @@
       h += at(`wc ${on ? 'on' : ''} ${on && fresh.some(x => x.r === r && x.c === c) ? 'new' : ''}`, WALL_X[c], ROW_Y[r], 68);
     }
     for (let r = 0; r < 5; r++) {
-      const line = p.lines[r], ok = canPlace && G.rowAccepts(p, r, sel.color), pre = mine && hintRow === r;
+      const line = p.lines[r], ok = canPlace && G.rowAccepts(p, r, sel.color), pre = false;
       h += at(`hit ${ok ? 'ok' : ''} ${pre ? 'pre' : ''}`, 232, ROW_Y[r], 392, ok ? `data-row="${r}"` : '', 76);
       const add = pre ? Math.min(r + 1 - line.n, countSel()) : 0;
       for (let d = 0; d < r + 1; d++) {
@@ -269,7 +268,7 @@
         else if (d < line.n + add) h += at(`t c${sel.color} ghost`, x, ROW_Y[r], 66);
       }
     }
-    const fOk = canPlace, fPre = mine && hintRow === 5;
+    const fOk = canPlace, fPre = false;
     h += at(`hit ${fOk ? 'ok' : ''} ${fPre ? 'pre' : ''}`, 330, 800, 604, fOk ? 'data-row="5"' : '', 108);
     p.floor.forEach((t, k) => { h += at(t === G.MARKER ? 't mk' : `t c${t}`, 77 + 84.5 * k, 802, 64); });
     if (fPre) for (let k = 0; k < Math.min(countSel(), 7 - p.floor.length); k++) h += at(`t c${sel.color} ghost`, 77 + 84.5 * (p.floor.length + k), 802, 64);
@@ -332,7 +331,6 @@
       rc.innerHTML = `<div class="recap"><b>Round ${v.scored.round} scored</b> · ${v.scored.players.map((s, i) => `${dot(i)}${esc(v.players[i].name)} ${s.delta >= 0 ? '+' : ''}${s.delta}${s.penalty ? ` (floor ${s.penalty})` : ''}`).join(' · ')}</div>`;
       if (lastScoredSeq !== v.seq) { lastScoredSeq = v.seq; buzz(20); }
     } else rc.innerHTML = '';
-    $('#hint').style.visibility = mine ? 'visible' : 'hidden';
   }
 
   // ---------- input ----------
@@ -343,8 +341,8 @@
     const t = e.target.closest('[data-color]');
     if (t && t.dataset.src !== undefined && t.classList.contains('pick')) {
       const src = +t.dataset.src, color = +t.dataset.color;
-      if (sel && sel.src === src && sel.color === color) sel = hintRow = null;
-      else { sel = { src, color }; hintRow = null; viewing = you; }
+      if (sel && sel.src === src && sel.color === color) sel = null;
+      else { sel = { src, color }; viewing = you; }
       buzz(8); return paint();
     }
     const row = e.target.closest('[data-row]');
@@ -356,12 +354,6 @@
     paint();
     if (local) scheduleLocalBot();
     if (view.winner !== null) setTimeout(showWin, 400);
-  }
-  function hint() {
-    if (!myMove()) return;
-    const a = BOT.plan(view, you);
-    if (!a) return;
-    viewing = you; sel = { src: a.src, color: a.color }; hintRow = a.row; paint();
   }
   function place(row) {
     if (!myMove() || !sel) return;
@@ -394,7 +386,7 @@
     if (local) {
       clearTimeout(local.timer); ackSeq = -1;
       local.S = JSON.parse(local.undo.snap); local.undo = null;
-      sel = hintRow = null; viewing = you;
+      sel = null; viewing = you;
       setView(G.view(local.S, 0)); scheduleLocalBot();
     } else if (net) {
       call('/api/undo', { code: net.code, token: net.token }).then(r => { if (r.error) toast(r.error); });
