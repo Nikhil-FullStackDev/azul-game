@@ -109,7 +109,7 @@ button { font: inherit; color: inherit; }
 .hit.ok { border-color: #fff9; background: #ffffff33; cursor: pointer; animation: pulse 1.2s infinite; }
 .hit.pre { border-color: var(--acc); background: #f2c23055; animation: none; }
 @keyframes pulse { 50% { background: #ffffff14; } }
-.sm { border-radius: 50%; background: var(--pc); box-shadow: 0 0 0 calc(2.5 * var(--p)) #000b, 0 0 calc(8 * var(--p)) #000; transition: left .5s, top .5s; pointer-events: none; }
+.pawn { border-radius: 50%; background: var(--pc); box-shadow: 0 0 0 calc(2.5 * var(--p)) #000b, 0 0 calc(8 * var(--p)) #000; transition: left .5s, top .5s; pointer-events: none; }
 
 .chip[data-view] { cursor: pointer; } .chip.view { background: #ffffff33; }
 .pb.mini { max-width: none; }
@@ -130,5 +130,5 @@ img { max-width: 100%; }
 
 .pd { display: inline-block; width: .7em; height: .7em; border-radius: 50%; margin-right: .4em; vertical-align: baseline; box-shadow: 0 0 0 2px #0008, 0 0 0 3px #ffffff66; }
 .chip span, .pb header b { white-space: nowrap; }
-.sm { box-shadow: 0 0 0 calc(2 * var(--p)) #000c, 0 0 0 calc(3.5 * var(--p)) #fff9; }
-.sm.own { box-shadow: 0 0 0 calc(2.5 * var(--p)) #000, 0 0 0 calc(5 * var(--p)) #fff, 0 0 calc(10 * var(--p)) #000; }
+.pawn { box-shadow: 0 0 0 calc(2 * var(--p)) #000c, 0 0 0 calc(3.5 * var(--p)) #fff9; }
+.pawn.own { box-shadow: 0 0 0 calc(2.5 * var(--p)) #000, 0 0 0 calc(5 * var(--p)) #fff, 0 0 calc(10 * var(--p)) #000; }

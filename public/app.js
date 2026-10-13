@@ -283,7 +283,7 @@
       const same = view.players.map((q, k) => k).filter(k => pos[k][0] === pos[j][0] && pos[k][1] === pos[j][1]);
       const n = same.indexOf(j), cnt = same.length;
       const dx = cnt > 1 ? (n - (cnt - 1) / 2) * 12 : 0, dy = cnt > 1 ? (n % 2 ? 7 : -7) : 0;
-      h += `<i class="sm ${j === i ? 'own' : ''}" title="${esc(view.players[j].name)}" style="--x:${pos[j][0] + dx};--y:${pos[j][1] + dy};--w:${j === i ? 28 : 21};--pc:${PLC[j]}"></i>`;
+      h += `<i class="pawn ${j === i ? 'own' : ''}" title="${esc(view.players[j].name)}" style="--x:${pos[j][0] + dx};--y:${pos[j][1] + dy};--w:${j === i ? 28 : 21};--pc:${PLC[j]}"></i>`;
     });
     return `<div class="pb ${turn ? 'turn' : ''}"><header><b>${dot(i)}${esc(p.name)}${mine ? ' (you)' : ''}</b><span>${p.score}</span></header><div class="bd">${h}</div></div>`;
   }
