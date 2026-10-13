@@ -169,7 +169,7 @@
       <div class="card"><div class="code">${s.code}</div>
         <div class="row"><button class="btn" id="share">Invite friends</button><button class="btn" id="copy">Copy code</button></div></div>
       <div class="card"><h2>Players (${n}/4)</h2><div class="plist">${s.lobby.map((p, i) =>
-        `<div class="pl" style="--c:var(--c${i})"><i></i><b>${esc(p.name)}${i === s.you ? ' (you)' : ''}</b><small>${i === 0 ? 'host' : p.bot ? 'bot' : p.connected ? '' : 'offline'}</small>${s.host && i > 0 ? `<button class="x" data-kick="${i}" aria-label="Remove">✕</button>` : ''}</div>`).join('')}</div>
+        `<div class="pl" style="--c:${PLC[i]}"><i></i><b>${esc(p.name)}${i === s.you ? ' (you)' : ''}</b><small>${i === 0 ? 'host' : p.bot ? 'bot' : p.connected ? '' : 'offline'}</small>${s.host && i > 0 ? `<button class="x" data-kick="${i}" aria-label="Remove">✕</button>` : ''}</div>`).join('')}</div>
         ${s.host ? `<button class="btn" id="bot" ${n >= 4 ? 'disabled' : ''}>+ Add bot</button>` : ''}</div>
       ${s.voice ? `<a class="btn pri" href="${esc(s.voice)}" target="_blank" rel="noopener noreferrer" style="text-align:center;text-decoration:none">🎙 Join voice chat</a>` : ''}
       ${s.host ? `<div class="row"><input class="field" id="voice" placeholder="Voice chat link (Discord / Meet…)" value="${esc(s.voice || '')}"><button class="btn" id="setvoice" style="flex:none">Set</button></div>` : ''}
@@ -245,7 +245,8 @@
 
   // Coordinates are pixels on the 894px board photo (public/img/board.jpg); CSS scales them.
   const ROW_Y = [357, 435, 512, 590, 668], WALL_X = [504, 582, 660, 737, 814], TRACK_Y = [78, 126, 175, 224, 273];
-  const PAWN = ['#ffffff', '#c58bff', '#46f08f', '#ff9a45'];
+  const PLC = ['#ff3b6b', '#b266ff', '#2ee66b', '#ff9a1f']; // one color per player: name dots and score pawns
+  const dot = i => `<i class="pd" style="background:${PLC[i]}"></i>`;
   const at = (cls, x, y, w, extra = '', h) => `<i class="${cls}" style="--x:${x};--y:${y};--w:${w}${h ? `;--h:${h}` : ''}" ${extra}></i>`;
   function boardHtml(p, i, mine) {
     const rev = reviewing();
@@ -272,10 +273,19 @@
     h += at(`hit ${fOk ? 'ok' : ''} ${fPre ? 'pre' : ''}`, 330, 800, 604, fOk ? 'data-row="5"' : '', 108);
     p.floor.forEach((t, k) => { h += at(t === G.MARKER ? 't mk' : `t c${t}`, 77 + 84.5 * k, 802, 64); });
     if (fPre) for (let k = 0; k < Math.min(countSel(), 7 - p.floor.length); k++) h += at(`t c${sel.color} ghost`, 77 + 84.5 * (p.floor.length + k), 802, 64);
-    const s = Math.min(100, p.score);
-    const px = s === 0 ? 70 : 68 + 40 * ((s - 1) % 20), py = s === 0 ? 32 : TRACK_Y[((s - 1) / 20) | 0];
-    h += `<i class="sm" style="--x:${px};--y:${py};--w:28;--pc:${PAWN[i]}"></i>`;
-    return `<div class="pb ${turn ? 'turn' : ''}"><header><b>${esc(p.name)}${mine ? ' (you)' : ''}</b><span>${p.score}</span></header><div class="bd">${h}</div></div>`;
+    // Every player's score pawn is on every board so you can gauge the race; the board's owner is drawn larger.
+    const pos = view.players.map((q, j) => {
+      const sc = Math.min(100, rev ? view.scored.before[j].score : q.score);
+      return sc === 0 ? [70, 32] : [68 + 40 * ((sc - 1) % 20), TRACK_Y[((sc - 1) / 20) | 0]];
+    });
+    const order = view.players.map((q, j) => j).sort((a, b) => (a === i) - (b === i)); // owner last = on top
+    order.forEach(j => {
+      const same = view.players.map((q, k) => k).filter(k => pos[k][0] === pos[j][0] && pos[k][1] === pos[j][1]);
+      const n = same.indexOf(j), cnt = same.length;
+      const dx = cnt > 1 ? (n - (cnt - 1) / 2) * 12 : 0, dy = cnt > 1 ? (n % 2 ? 7 : -7) : 0;
+      h += `<i class="sm ${j === i ? 'own' : ''}" title="${esc(view.players[j].name)}" style="--x:${pos[j][0] + dx};--y:${pos[j][1] + dy};--w:${j === i ? 28 : 21};--pc:${PLC[j]}"></i>`;
+    });
+    return `<div class="pb ${turn ? 'turn' : ''}"><header><b>${dot(i)}${esc(p.name)}${mine ? ' (you)' : ''}</b><span>${p.score}</span></header><div class="bd">${h}</div></div>`;
   }
   function countSel() {
     if (!sel || !view) return 0;
@@ -285,7 +295,7 @@
   function paint() {
     if (!inGame || !view) return;
     const v = view, over = v.winner !== null, mine = myMove(), rev = reviewing();
-    $('#chips').innerHTML = v.players.map((p, i) => `<div class="chip ${!over && v.turn === i ? 'turn' : ''} ${viewing === i ? 'view' : ''}" data-view="${i}"><span>${esc(p.name)}</span><b>${rev ? v.scored.before[i].score : p.score}</b></div>`).join('');
+    $('#chips').innerHTML = v.players.map((p, i) => `<div class="chip ${!over && v.turn === i ? 'turn' : ''} ${viewing === i ? 'view' : ''}" data-view="${i}"><span>${dot(i)}${esc(p.name)}</span><b>${rev ? v.scored.before[i].score : p.score}</b></div>`).join('');
     // factories + middle
     const fl = rev ? v.factories.map(() => []) : v.factories, cen = rev ? [] : v.center; // new round's tiles stay hidden until you resolve
     const facs = fl.map((f, i) => `<div class="fac ${f.length ? '' : 'empty'}">${f.map(c => {
@@ -319,7 +329,7 @@
     // round recap
     const rc = $('#recap');
     if (v.scored && v.scored.seq === v.seq && !over && !rev) {
-      rc.innerHTML = `<div class="recap"><b>Round ${v.scored.round} scored</b> · ${v.scored.players.map((s, i) => `${esc(v.players[i].name)} ${s.delta >= 0 ? '+' : ''}${s.delta}${s.penalty ? ` (floor ${s.penalty})` : ''}`).join(' · ')}</div>`;
+      rc.innerHTML = `<div class="recap"><b>Round ${v.scored.round} scored</b> · ${v.scored.players.map((s, i) => `${dot(i)}${esc(v.players[i].name)} ${s.delta >= 0 ? '+' : ''}${s.delta}${s.penalty ? ` (floor ${s.penalty})` : ''}`).join(' · ')}</div>`;
       if (lastScoredSeq !== v.seq) { lastScoredSeq = v.seq; buzz(20); }
     } else rc.innerHTML = '';
     $('#hint').style.visibility = mine ? 'visible' : 'hidden';
@@ -416,7 +426,7 @@
     const order = v.players.map((p, i) => i).sort((a, b) => v.players[b].score - v.players[a].score);
     const online = !!net, host = snap && snap.host;
     const s = sheet(`<div class="win"><div class="big">${iWon ? (v.winners.length > 1 ? 'You tie for the win!' : 'You win!') : esc(names) + ' wins!'}</div></div>
-      <table class="tbl"><tr><th></th><th>Rows</th><th>Cols</th><th>Sets</th><th>Score</th></tr>${order.map(i => `<tr class="${v.winners.includes(i) ? 'w1' : ''}"><td>${esc(v.players[i].name)}</td><td>${v.final[i].rows}</td><td>${v.final[i].cols}</td><td>${v.final[i].sets}</td><td>${v.players[i].score}</td></tr>`).join('')}</table>
+      <table class="tbl"><tr><th></th><th>Rows</th><th>Cols</th><th>Sets</th><th>Score</th></tr>${order.map(i => `<tr class="${v.winners.includes(i) ? 'w1' : ''}"><td>${dot(i)}${esc(v.players[i].name)}</td><td>${v.final[i].rows}</td><td>${v.final[i].cols}</td><td>${v.final[i].sets}</td><td>${v.players[i].score}</td></tr>`).join('')}</table>
       <p class="tiny">Bonuses: +2 row, +7 column, +10 color set. Ties go to the most full rows.</p>
       ${online ? (host ? '<button class="btn pri" id="again">Play again</button><button class="btn" id="lob">Back to lobby</button>' : '<p class="tiny">Waiting for the host to start another game…</p>')
         : '<button class="btn pri" id="again">Play again</button>'}

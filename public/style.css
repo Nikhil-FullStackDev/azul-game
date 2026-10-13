@@ -127,3 +127,8 @@ img { max-width: 100%; }
   .logo h1 { font-size: 34px; }
   #game { padding-left: 4px; padding-right: 4px; }
 }
+
+.pd { display: inline-block; width: .7em; height: .7em; border-radius: 50%; margin-right: .4em; vertical-align: baseline; box-shadow: 0 0 0 2px #0008, 0 0 0 3px #ffffff66; }
+.chip span, .pb header b { white-space: nowrap; }
+.sm { box-shadow: 0 0 0 calc(2 * var(--p)) #000c, 0 0 0 calc(3.5 * var(--p)) #fff9; }
+.sm.own { box-shadow: 0 0 0 calc(2.5 * var(--p)) #000, 0 0 0 calc(5 * var(--p)) #fff, 0 0 calc(10 * var(--p)) #000; }
